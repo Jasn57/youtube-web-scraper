@@ -1,35 +1,35 @@
+import os
 import requests
-from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 import pandas as pd
 
-url = "https://www.youtube.com/feed/trending"
+load_dotenv()
 
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-}
+api_key = os.getenv('YOUTUBE_API_KEY')
 
-response = requests.get(url, headers=headers)
+url = f'https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=US&key={api_key}'
 
-soup = BeautifulSoup(response.text, 'html.parser')
+response = requests.get(url)
+  
+if response.status_code == 200:
+    data = response.json()
 
-videos = soup.find_all('ytd-video-renderer')
-
-video_data = []
-for video in videos:
-    title = video.find('a', {'id': 'video-title'})
-    if title:
-        title = title.get('title')
-        url = 'https://www.youtube.com' + title.get('href')
-        views = video.find('span', {"class": 'view-count'})
-        views = views.text if views else 'N/A'
+    video_data = []
+    for item in data['items']:
+        title = item['snippet']['title']
+        video_url = f'https://www.youtube.com/watch?v={item["id"]}'
+        views = item['statistics'].get('viewCount', 'N/A')
+        likes = item['statistics'].get('likeCount', 'N/A')  
         video_data.append({
             'title': title,
-            'url': url,
-            'views': views
+            'url': video_url,
+            'views': views,
+            'likes': likes
         })
 
-df = pd.DataFrame(video_data)
+    df = pd.DataFrame(video_data)
+    df.to_csv('trending_videos.csv', index=False)
 
-df.to_csv('trending_videos.csv', index=False)
-
-print(df)
+    print(df)
+else:
+    print(f"Failed to fetch data. HTTP status code: {response.status_code}")
